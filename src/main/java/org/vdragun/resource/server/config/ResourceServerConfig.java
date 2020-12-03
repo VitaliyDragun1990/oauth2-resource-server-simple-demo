@@ -8,14 +8,16 @@ import org.springframework.security.config.annotation.web.configuration.WebSecur
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
+import java.security.KeyFactory;
+import java.security.interfaces.RSAPublicKey;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.Base64;
 
 @Configuration
 public class ResourceServerConfig extends WebSecurityConfigurerAdapter {
 
-    @Value("${jwt.key}")
-    private String jwtKey;
+    @Value("${jks.publicKey}")
+    private String publicKey;
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
@@ -27,9 +29,16 @@ public class ResourceServerConfig extends WebSecurityConfigurerAdapter {
 
     @Bean
     public JwtDecoder jwtDecoder() {
-        byte[] key = jwtKey.getBytes();
-        SecretKey originalKey = new SecretKeySpec(key, 0, key.length, "AES");
+        try {
+            KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+            byte[] keyBytes = Base64.getDecoder().decode(publicKey);
 
-        return NimbusJwtDecoder.withSecretKey(originalKey).build();
+            X509EncodedKeySpec keySpec = new X509EncodedKeySpec(keyBytes);
+            RSAPublicKey rsaKey = (RSAPublicKey) keyFactory.generatePublic(keySpec);
+
+            return NimbusJwtDecoder.withPublicKey(rsaKey).build();
+        } catch (Exception e) {
+            throw new RuntimeException("Wrong public key");
+        }
     }
 }
